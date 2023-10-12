@@ -1,0 +1,156 @@
+openapi: "3.0.0"
+info:
+  description: IPS Payments RESTful API Definitions - CI Side
+  version: "0.2"
+  title: IPS Payments
+  contact:
+    name: Neil Masters
+    email: neil.masters@mastercard.com
+    url: 'http://www.vocalink.com'
+servers:
+  - url: /api
+  - url: localhost:8081
+paths:
+  /health-checks:
+    put:
+      tags:
+        - IPS Payments
+      summary: Health Check
+      description: Check the health of the IPS connection utilising the admin echo messages
+      operationId: healthCheck
+      requestBody:
+        description: An ISO20022 message with an admn.005 message as the payload.
+        required: true
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Message'
+      responses:
+        '200':
+          description: Successful operation. Returns an ISO20022 message with an admn.006 message as the payload.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Structural validation error. Returns an ISO20022 message with an admi.002 message as the payload.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '500':
+          description: Serious system error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /customer-credit-transfer:
+    post:
+      tags:
+        - IPS Payments
+      summary: New payment or non-payment instruction
+      description: New payment or non-payment instruction. The request represents an asynchronous Leg 1 message and the response indicates that the message was received successfully. It does not indicate that the transaction in its entirety was successful.
+      operationId: serviceRequest
+      requestBody:
+        description: An ISO20022 message with a pacs.008, pain.013 or similar message as the payload.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+            example:
+              financialInstitutionIdentification: BNNNPH22XXX
+              totalInterbankSettlementAmount: 300
+              debtorName: John Smith
+              debtorBirthDt: 1996-06-15
+              debtorCityOfBirth: Pasay
+              debtorCountryOfBirth: PH
+              debtorId: N01-23-456789
+              creditorName: Juan Dela Cruz
+      responses:
+        '202':
+          description: Successful operation. The Central Infrastructure will return this in response to a leg 1 request to indicate that it has successfully received the message. This does not imply that the message will not subsequently fail.
+        '400':
+          description: Structural or business validation error. Returns an ISO20022 message with either an admi.002 or pacs.002 message as the payload respectively.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                An error has occured. Please recheck input
+        '500':
+          description: Serious system error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /participants/{participant_id}:
+    put:
+      tags:
+        - IPS Payments
+      summary: Sign-on / sign-off for Participants
+      description: Participant sign-on or sign-off endpoint.
+      operationId: participant
+      requestBody:
+        description: An ISO20022 message with an admn.001 or admn.003 message as the payload, depending on whether the call is to sign on or to sign off.
+        required: true
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Message'
+      parameters:
+        - in: path
+          name: participant_id
+          description: The identifier for the participant signing on / off
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation. Returns an ISO20022 message with an admn.002 or an admn.004 message as the payload, depending on whether the call is to sign on or to sign off.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Structural error or rejection. Returns an ISO20022 message with either an admi.002 for structural failures or admn.002 or admmn.004 message for rejections.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '500':
+          description: Serious system error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Message:
+      type: object
+      description: A complete ISO20022 message. The actual payload depends on the specifics of the end-point in use.
+    Error:
+      type: object
+      required:
+        - Errors
+      properties:
+        Errors:
+          type: object
+          required:
+            - Error
+          properties:
+            Error:
+              type: "array"
+              items:
+                type: "object"
+                properties:
+                  Source:
+                    type: "string"
+                  ReasonCode:
+                    type: "string"
+                  Description:
+                    type: "string"
+                  Recoverable:
+                    type: "boolean"
+                  Details:
+                    type: "string"
